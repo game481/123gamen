@@ -1,0 +1,706 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArcadeVerse — 14 Playable Mini-Games</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+body{font-family:Inter,sans-serif;background:#0b0f19;color:#f3f4f6}
+.arcade-font{font-family:'Press Start 2P',monospace}
+.glow-box{box-shadow:0 0 20px #6366f133;border:1px solid #6366f155}
+.glow-box:hover{box-shadow:0 0 25px #a855f780;border-color:#a855f799}
+canvas{image-rendering:pixelated;touch-action:none}
+.game-card{min-height:220px}
+</style>
+</head>
+<body class="min-h-screen">
+
+<header class="sticky top-0 z-10 border-b border-gray-800 bg-gray-900/90 backdrop-blur">
+<div class="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-3">
+<h1 onclick="showHub()" class="arcade-font text-lg md:text-2xl text-indigo-300 cursor-pointer">ARCADEVERSE 🕹️</h1>
+<div class="text-xs text-gray-400">High scores saved on this device 💾</div>
+</div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-8">
+<section id="hub-view" class="space-y-8">
+<div class="text-center space-y-3">
+<h2 class="text-3xl md:text-5xl font-extrabold">Choose Your Game</h2>
+<p class="text-gray-400 max-w-2xl mx-auto">14 arcade games. Use keyboard controls or the buttons on screen. Progress and best scores are saved locally.</p>
+</div>
+<div id="game-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+</section>
+
+<section id="game-view" class="hidden flex-col items-center gap-5">
+<div class="w-full max-w-2xl flex justify-between items-center gap-3 bg-gray-900 p-4 rounded-xl border border-gray-800">
+<button onclick="showHub()" class="text-sm bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg">← Game Hub</button>
+<div id="game-title" class="arcade-font text-xs md:text-sm text-indigo-300 text-center">GAME</div>
+<div id="game-score" class="arcade-font text-xs md:text-sm text-emerald-300">0</div>
+</div>
+
+<div class="relative bg-black rounded-2xl overflow-hidden border border-gray-800 shadow-2xl w-full max-w-[400px]">
+<canvas id="gameCanvas" width="400" height="600" class="block w-full h-auto"></canvas>
+<div id="game-overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center p-6 text-center">
+<h3 id="overlay-title" class="arcade-font text-xl mb-3 text-indigo-300">READY?</h3>
+<p id="overlay-desc" class="text-gray-300 text-sm mb-6">Press start to play.</p>
+<button id="overlay-btn" onclick="startRound()" class="arcade-font bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-5 py-4 rounded-xl">START GAME</button>
+</div>
+</div>
+
+<div class="grid grid-cols-3 gap-3 w-full max-w-[400px] md:hidden">
+<button class="bg-gray-800 p-4 rounded-xl" onpointerdown="press('left')" onpointerup="release('left')" onpointerleave="release('left')">◀ LEFT</button>
+<button class="bg-gray-800 p-4 rounded-xl" onpointerdown="press('action')" onpointerup="release('action')" onpointerleave="release('action')">ACTION</button>
+<button class="bg-gray-800 p-4 rounded-xl" onpointerdown="press('right')" onpointerup="release('right')" onpointerleave="release('right')">RIGHT ▶</button>
+</div>
+<p class="text-xs text-gray-500 text-center">Keyboard: arrows / WASD • Space or Z = action • Esc = hub</p>
+</section>
+</main>
+
+<footer class="border-t border-gray-800 py-6 text-center text-xs text-gray-500">ArcadeVerse • HTML5 Canvas mini-games</footer>
+
+<script>
+const gameDefs = [
+{id:'racer',name:'Pixel Racer',icon:'🏎️',tag:'HARD MODE',color:'#818cf8',desc:'Dodge traffic and survive the road.',controls:'Left/right arrows or A/D'},
+{id:'snake',name:'Neon Snake',icon:'🐍',tag:'CLASSIC',color:'#34d399',desc:'Eat glowing orbs. Avoid walls and your tail.',controls:'Arrow keys or WASD'},
+{id:'blaster',name:'Space Blaster',icon:'🚀',tag:'SHOOTER',color:'#c084fc',desc:'Blast alien invaders before they escape.',controls:'Left/right to move, Space to fire'},
+{id:'bricks',name:'Brick Breaker',icon:'🧱',tag:'ARCADE',color:'#f472b6',desc:'Bounce the ball and break every brick.',controls:'Left/right or A/D to move paddle'},
+{id:'platform',name:'Pixel Platformer',icon:'🦘',tag:'JUMPER',color:'#fbbf24',desc:'Jump over hazards and reach the exit.',controls:'Left/right to move, Space to jump'},
+{id:'maze',name:'Maze Runner',icon:'🌀',tag:'MAZE',color:'#22d3ee',desc:'Find the exit while dodging roaming bots.',controls:'Arrow keys or WASD'},
+{id:'zombie',name:'Zombie Survival',icon:'🧟',tag:'SURVIVAL',color:'#a3e635',desc:'Move and fire to survive the zombie wave.',controls:'Arrows to move, Space to fire'},
+{id:'asteroid',name:'Asteroid Dodge',icon:'☄️',tag:'DODGE',color:'#fb923c',desc:'Pilot through an asteroid field.',controls:'Left/right to steer, Space to boost'},
+{id:'hoop',name:'Hoop Master',icon:'🏀',tag:'SKILL',color:'#fb7185',desc:'Time your shots and score baskets.',controls:'Space / Action to shoot'},
+{id:'tower',name:'Tower Defense',icon:'🏰',tag:'STRATEGY',color:'#60a5fa',desc:'Click or tap the field to place towers.',controls:'Click/tap to place towers'},
+{id:'pong',name:'Neon Pong',icon:'🏓',tag:'DUEL',color:'#2dd4bf',desc:'Beat the computer to seven points.',controls:'Up/down or W/S'},
+{id:'drift',name:'Drift King',icon:'🏁',tag:'RACING',color:'#e879f9',desc:'Steer through a winding track and avoid cones.',controls:'Left/right arrows or A/D'},
+{id:'blocks',name:'Block Puzzle',icon:'🧩',tag:'PUZZLE',color:'#facc15',desc:'Slide falling blocks and clear complete rows.',controls:'Left/right, Down, Up to rotate'},
+{id:'flight',name:'Neon Flight',icon:'🚁',tag:'ENDLESS',color:'#38bdf8',desc:'Flap through gaps without crashing.',controls:'Space / Action to flap'}
+];
+
+const $=id=>document.getElementById(id);
+const canvas=$('gameCanvas'),ctx=canvas.getContext('2d');
+const scores={},levels={};
+let current=null,loop=null,raf=null,run=null,score=0,level=1,keys={},touch={left:false,right:false,action:false};
+
+gameDefs.forEach(g=>{
+  scores[g.id]=+(localStorage.getItem('av_score_'+g.id)||0);
+  levels[g.id]=+(localStorage.getItem('av_level_'+g.id)||1);
+});
+
+$('game-grid').innerHTML=gameDefs.map(g=>`
+<article class="game-card glow-box bg-gray-900/80 rounded-2xl p-5 flex flex-col justify-between transition hover:-translate-y-1 cursor-pointer" onclick="openGame('${g.id}')">
+<div>
+<div class="flex justify-between items-center mb-4">
+<span class="text-3xl">${g.icon}</span>
+<span class="text-[10px] arcade-font rounded-full px-3 py-2" style="background:${g.color}22;color:${g.color};border:1px solid ${g.color}66">${g.tag}</span>
+</div>
+<h3 class="text-lg font-bold mb-2">${g.name}</h3>
+<p class="text-gray-400 text-sm">${g.desc}</p>
+</div>
+<div class="flex justify-between items-center mt-5 pt-4 border-t border-gray-800 text-xs">
+<span class="text-gray-400">Best: <b style="color:${g.color}">${scores[g.id]}</b> · Level ${levels[g.id]}</span>
+<b style="color:${g.color}">PLAY →</b>
+</div>
+</article>`).join('');
+
+function drawText(t,x,y,size=18,color='#fff',align='center'){
+  ctx.fillStyle=color;
+  ctx.font=`bold ${size}px Inter`;
+  ctx.textAlign=align;
+  ctx.fillText(t,x,y);
+}
+function base(bg='#0b0f19'){
+  ctx.fillStyle=bg;
+  ctx.fillRect(0,0,400,600);
+}
+function rect(o,c){
+  ctx.fillStyle=c;
+  ctx.fillRect(o.x,o.y,o.w,o.h);
+}
+function circle(x,y,r,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();
+  ctx.arc(x,y,r,0,Math.PI*2);
+  ctx.fill();
+}
+
+function openGame(id){
+  current=gameDefs.find(g=>g.id===id);
+  level=levels[id]||1;
+  score=0;
+  $('hub-view').classList.add('hidden');
+  $('game-view').classList.remove('hidden');
+  $('game-view').classList.add('flex');
+  $('game-title').textContent=current.icon+' '+current.name.toUpperCase();
+  $('game-overlay').classList.remove('hidden');
+  $('overlay-title').textContent='READY?';
+  $('overlay-desc').textContent=current.desc+' Controls: '+current.controls+'.';
+  $('overlay-btn').textContent='START GAME';
+  base();
+  drawText(current.name,200,290,22,current.color);
+}
+
+function showHub(){
+  stop();
+  current=null;
+  $('game-view').classList.add('hidden');
+  $('game-view').classList.remove('flex');
+  $('hub-view').classList.remove('hidden');
+}
+function stop(){
+  if(loop)clearInterval(loop);
+  if(raf)cancelAnimationFrame(raf);
+  loop=null;
+  raf=null;
+  run=null;
+}
+function press(k){
+  touch[k]=true;
+  if(current?.id==='flight'&&run)run.flap?.();
+  if(current?.id==='hoop'&&run)run.shoot?.();
+}
+function release(k){touch[k]=false}
+
+window.addEventListener('keydown',e=>{
+  keys[e.code]=true;
+  if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();
+  if(e.code==='Escape')showHub();
+  if(current?.id==='flight'&&e.code==='Space')run?.flap?.();
+  if(current?.id==='hoop'&&e.code==='Space')run?.shoot?.();
+});
+window.addEventListener('keyup',e=>keys[e.code]=false);
+
+function finish(win,msg){
+  stop();
+  if(win){
+    scores[current.id]=Math.max(scores[current.id],score);
+    levels[current.id]=Math.min(50,level+1);
+    localStorage.setItem('av_score_'+current.id,scores[current.id]);
+    localStorage.setItem('av_level_'+current.id,levels[current.id]);
+  }
+  renderCards();
+  $('game-overlay').classList.remove('hidden');
+  $('overlay-title').textContent=win?'LEVEL CLEAR! 🎉':'TRY AGAIN!';
+  $('overlay-desc').textContent=msg+' Score: '+score;
+  $('overlay-btn').textContent=win?'NEXT LEVEL':'RETRY';
+}
+function renderCards(){
+  [...$('game-grid').children].forEach((el,i)=>{
+    const g=gameDefs[i];
+    el.querySelector('.text-xs').innerHTML=`Best: <b style="color:${g.color}">${scores[g.id]}</b> · Level ${levels[g.id]}`;
+  });
+}
+function startRound(){
+  stop();
+  $('game-overlay').classList.add('hidden');
+  score=0;
+  updateScore();
+  const id=current.id;
+  const game={
+    racer:gameRacer,snake:gameSnake,blaster:gameBlaster,bricks:gameBricks,
+    platform:gamePlatform,maze:gameMaze,zombie:gameZombie,asteroid:gameAsteroid,
+    hoop:gameHoop,tower:gameTower,pong:gamePong,drift:gameDrift,
+    blocks:gameBlocks,flight:gameFlight
+  };
+  run={};
+  game[id]();
+}
+function updateScore(){
+  $('game-score').textContent='LV '+level+' · '+score;
+}
+function add(n=1){
+  score+=n;
+  updateScore();
+}
+function tick(fn,ms=16){loop=setInterval(fn,ms)}
+function win(msg){finish(true,msg)}
+function lose(msg){finish(false,msg)}
+
+function gameRacer(){
+  let car={x:180,y:510,w:36,h:58},obs=[],frame=0;
+  tick(()=>{
+    frame++;
+    base('#111827');
+    ctx.fillStyle='#374151';
+    ctx.fillRect(65,0,270,600);
+    for(let y=(frame*8)%60-60;y<600;y+=60){
+      ctx.fillStyle='#f9fafb';
+      ctx.fillRect(151,y,4,30);
+      ctx.fillRect(245,y,4,30);
+    }
+    if(frame%35===0)obs.push({x:[85,180,275][Math.floor(Math.random()*3)],y:-65});
+    obs.forEach(o=>o.y+=5+level*.25);
+    obs=obs.filter(o=>o.y<620);
+    if(keys.ArrowLeft||keys.KeyA||touch.left)car.x-=6;
+    if(keys.ArrowRight||keys.KeyD||touch.right)car.x+=6;
+    car.x=Math.max(70,Math.min(294,car.x));
+    rect(car,'#818cf8');
+    ctx.fillStyle='#c7d2fe';
+    ctx.fillRect(car.x+6,car.y+8,24,15);
+    for(const o of obs){
+      rect({x:o.x,y:o.y,w:35,h:55},'#ef4444');
+      if(car.x<o.x+35&&car.x+36>o.x&&car.y<o.y+55&&car.y+58>o.y)
+        return lose('Traffic collision!');
+    }
+    if(frame%10===0)add();
+    if(frame>900+level*20)return win('Finish line reached!');
+  },16);
+}
+
+function gameSnake(){
+  let s=[{x:10,y:15},{x:9,y:15},{x:8,y:15}],
+      d={x:1,y:0},food={x:14,y:15},n=0;
+  const set=(x,y)=>{if(x!==-d.x||y!==-d.y)d={x,y}};
+  run.set=set;
+  let last=0;
+  tick(()=>{
+    if(keys.ArrowLeft||keys.KeyA)set(-1,0);
+    if(keys.ArrowRight||keys.KeyD)set(1,0);
+    if(keys.ArrowUp||keys.KeyW)set(0,-1);
+    if(keys.ArrowDown||keys.KeyS)set(0,1);
+    if(++last<Math.max(3,8-level/10))return;
+    last=0;
+    let h={x:s[0].x+d.x,y:s[0].y+d.y};
+    if(h.x<0||h.x>=20||h.y<0||h.y>=29||s.some(p=>p.x===h.x&&p.y===h.y))
+      return lose('Snake hit something!');
+    s.unshift(h);
+    if(h.x===food.x&&h.y===food.y){
+      add(10);
+      n++;
+      food={x:Math.floor(Math.random()*20),y:Math.floor(Math.random()*29)};
+      if(n>=5+Math.floor(level/2))return win('All orbs collected!');
+    }else s.pop();
+    base();
+    circle(food.x*20+9,30+food.y*20+9,8,'#34d399');
+    s.forEach((p,i)=>rect({x:p.x*20+1,y:21+p.y*20,w:17,h:17},i?'#059669':'#6ee7b7'));
+  },20);
+}
+
+function gameBlaster(){
+  let ship=180,bul=[],ali=[],f=0,k=0;
+  tick(()=>{
+    f++;
+    base();
+    if(keys.ArrowLeft||keys.KeyA||touch.left)ship-=5;
+    if(keys.ArrowRight||keys.KeyD||touch.right)ship+=5;
+    ship=Math.max(0,Math.min(360,ship));
+    if((keys.Space||touch.action)&&f%10===0)bul.push({x:ship+18,y:520});
+    if(f%28===0)ali.push({x:Math.random()*360,y:-25});
+    bul.forEach(b=>b.y-=8);
+    ali.forEach(a=>a.y+=2+level*.08);
+    for(let i=ali.length-1;i>=0;i--){
+      for(let j=bul.length-1;j>=0;j--){
+        if(Math.abs(ali[i].x-bul[j].x)<25&&Math.abs(ali[i].y-bul[j].y)<25){
+          ali.splice(i,1);
+          bul.splice(j,1);
+          add(10);
+          k++;
+          break;
+        }
+      }
+    }
+    if(ali.some(a=>a.y>570))return lose('An invader escaped!');
+    rect({x:ship,y:535,w:40,h:28},'#a855f7');
+    bul.forEach(b=>rect({x:b.x,y:b.y,w:4,h:12},'#f43f5e'));
+    ali.forEach(a=>rect({x:a.x,y:a.y,w:28,h:25},'#ec4899'));
+    if(k>=8+level)return win('Wave destroyed!');
+  },16);
+}
+
+function gameBricks(){
+  let paddle=150,ball={x:200,y:400,dx:3,dy:-4},br=[];
+  for(let r=0;r<5+Math.min(level,5);r++)
+    for(let c=0;c<6;c++)
+      br.push({x:8+c*65,y:50+r*25,w:58,h:17});
+  tick(()=>{
+    base();
+    if(keys.ArrowLeft||keys.KeyA||touch.left)paddle-=7;
+    if(keys.ArrowRight||keys.KeyD||touch.right)paddle+=7;
+    paddle=Math.max(0,Math.min(310,paddle));
+    ball.x+=ball.dx;
+    ball.y+=ball.dy;
+    if(ball.x<8||ball.x>392)ball.dx*=-1;
+    if(ball.y<30)ball.dy=Math.abs(ball.dy);
+    if(ball.y>550&&ball.x>paddle&&ball.x<paddle+90&&ball.dy>0)
+      ball.dy=-Math.abs(ball.dy);
+    if(ball.y>610)return lose('The ball fell!');
+    for(let i=0;i<br.length;i++){
+      let b=br[i];
+      if(ball.x>b.x&&ball.x<b.x+b.w&&ball.y>b.y&&ball.y<b.y+b.h){
+        br.splice(i,1);
+        ball.dy*=-1;
+        add(10);
+        break;
+      }
+    }
+    rect({x:paddle,y:555,w:90,h:12},'#f472b6');
+    circle(ball.x,ball.y,7,'white');
+    br.forEach(b=>rect(b,['#fb7185','#fbbf24','#a78bfa'][Math.floor(b.y/25)%3]));
+    if(!br.length)return win('All bricks smashed!');
+  },16);
+}
+
+function gamePlatform(){
+  let p={x:25,y:500,vy:0},
+      coins=[100,190,280,350].map(x=>({x,y:430-Math.random()*180,got:false})),
+      f=0;
+  tick(()=>{
+    f++;
+    base('#10172a');
+    ctx.fillStyle='#374151';
+    ctx.fillRect(0,550,400,50);
+    for(let i=0;i<5;i++)
+      rect({x:i*90+25,y:470-(i%2)*70,w:55,h:12},'#64748b');
+    if(keys.ArrowLeft||keys.KeyA||touch.left)p.x-=4;
+    if(keys.ArrowRight||keys.KeyD||touch.right)p.x+=4;
+    if((keys.Space||keys.ArrowUp||keys.KeyW||touch.action)&&p.y>=510)p.vy=-11;
+    p.vy+=.45;
+    p.y+=p.vy;
+    p.x=Math.max(0,Math.min(370,p.x));
+    if(p.y>510){p.y=510;p.vy=0}
+    coins.forEach(c=>{
+      if(!c.got){
+        circle(c.x,c.y,8,'#facc15');
+        if(Math.abs(p.x-c.x)<20&&Math.abs(p.y-c.y)<20){
+          c.got=true;
+          add(10);
+        }
+      }
+    });
+    rect({x:p.x,y:p.y,w:28,h:35},'#818cf8');
+    rect({x:360,y:505,w:25,h:45},'#34d399');
+    if(p.x>345&&p.y>490)return win('You reached the exit!');
+    if(f>1800)return lose('Time ran out!');
+  },16);
+}
+
+function gameMaze(){
+  const grid=Array.from({length:15},()=>Array.from({length:10},()=>Math.random()<.20?1:0));
+  grid[1][1]=grid[13][8]=0;
+  let p={x:1,y:1},e={x:8,y:13},f=0;
+  function draw(){
+    base();
+    for(let y=0;y<15;y++)
+      for(let x=0;x<10;x++)
+        if(grid[y][x])rect({x:x*40,y:y*40,w:39,h:39},'#334155');
+    circle(p.x*40+20,p.y*40+20,14,'#22d3ee');
+    circle(e.x*40+20,e.y*40+20,14,'#34d399');
+  }
+  run.move=(dx,dy)=>{
+    let x=p.x+dx,y=p.y+dy;
+    if(x>=0&&x<10&&y>=0&&y<15&&!grid[y][x]){
+      p={x,y};
+      add(1);
+      if(x===e.x&&y===e.y)win('Maze escaped!');
+      draw();
+    }
+  };
+  tick(()=>{
+    f++;
+    if(keys.ArrowLeft||keys.KeyA)run.move(-1,0);
+    else if(keys.ArrowRight||keys.KeyD)run.move(1,0);
+    else if(keys.ArrowUp||keys.KeyW)run.move(0,-1);
+    else if(keys.ArrowDown||keys.KeyS)run.move(0,1);
+    if(f%30===0){
+      let dx=Math.sign(p.x-e.x),dy=Math.sign(p.y-e.y);
+      if(Math.random()<.5&&!grid[e.y+dy]?.[e.x])e.y+=dy;
+      else if(!grid[e.y]?.[e.x+dx])e.x+=dx;
+      if(p.x===e.x&&p.y===e.y)lose('A bot caught you!');
+    }
+    draw();
+  },120);
+}
+
+function gameZombie(){
+  let p={x:180,y:300},zs=[],bul=[],f=0;
+  tick(()=>{
+    f++;
+    base('#101510');
+    if(keys.ArrowLeft||keys.KeyA||touch.left)p.x-=4;
+    if(keys.ArrowRight||keys.KeyD||touch.right)p.x+=4;
+    if(keys.ArrowUp||keys.KeyW)p.y-=4;
+    if(keys.ArrowDown||keys.KeyS)p.y+=4;
+    if((keys.Space||touch.action)&&f%12===0)bul.push({x:p.x+8,y:p.y});
+    if(f%35===0)zs.push({x:Math.random()*380,y:Math.random()<.5?0:580});
+    bul.forEach(b=>b.y-=7);
+    zs.forEach(z=>{
+      let dx=p.x-z.x,dy=p.y-z.y,d=Math.hypot(dx,dy)||1;
+      z.x+=dx/d*1.1;
+      z.y+=dy/d*1.1;
+    });
+    for(let i=zs.length-1;i>=0;i--){
+      for(let j=bul.length-1;j>=0;j--){
+        if(Math.hypot(zs[i].x-bul[j].x,zs[i].y-bul[j].y)<20){
+          zs.splice(i,1);
+          bul.splice(j,1);
+          add(10);
+          break;
+        }
+      }
+    }
+    if(zs.some(z=>Math.hypot(z.x-p.x,z.y-p.y)<20))
+      return lose('A zombie got too close!');
+    circle(p.x,p.y,14,'#60a5fa');
+    zs.forEach(z=>circle(z.x,z.y,13,'#84cc16'));
+    bul.forEach(b=>circle(b.x,b.y,4,'#fef08a'));
+    if(f>1200)return win('You survived the wave!');
+  },16);
+}
+
+function gameAsteroid(){
+  let p={x:180,y:500},rocks=[],f=0;
+  tick(()=>{
+    f++;
+    base();
+    if(keys.ArrowLeft||keys.KeyA||touch.left)p.x-=5;
+    if(keys.ArrowRight||keys.KeyD||touch.right)p.x+=5;
+    p.x=Math.max(10,Math.min(390,p.x));
+    if(f%20===0)rocks.push({x:Math.random()*380,y:-20,r:10+Math.random()*15,s:3+Math.random()*2});
+    rocks.forEach(r=>r.y+=r.s);
+    rocks=rocks.filter(r=>r.y<620);
+    if(rocks.some(r=>Math.hypot(r.x-p.x,r.y-520)<r.r+12))
+      return lose('Asteroid collision!');
+    rocks.forEach(r=>circle(r.x,r.y,r.r,'#fb923c'));
+    ctx.fillStyle='#38bdf8';
+    ctx.beginPath();
+    ctx.moveTo(p.x,490);
+    ctx.lineTo(p.x-13,520);
+    ctx.lineTo(p.x+13,520);
+    ctx.fill();
+    if(f%10===0)add();
+    if(f>900)return win('Asteroid field cleared!');
+  },16);
+}
+
+function gameHoop(){
+  let ball={x:80,y:480,vx:0,vy:0,active:false},
+      hoop={x:290,y:240},f=0,made=0;
+  run.shoot=()=>{
+    if(!ball.active){
+      ball.active=true;
+      ball.vx=4+Math.random()*2;
+      ball.vy=-10;
+    }
+  };
+  tick(()=>{
+    f++;
+    base('#172033');
+    rect({x:0,y:555,w:400,h:45},'#475569');
+    rect({x:hoop.x,y:hoop.y,w:8,h:55},'#f97316');
+    ctx.strokeStyle='#fb923c';
+    ctx.lineWidth=5;
+    ctx.beginPath();
+    ctx.ellipse(hoop.x-13,hoop.y+28,23,7,0,0,Math.PI*2);
+    ctx.stroke();
+    if(ball.active){
+      ball.x+=ball.vx;
+      ball.y+=ball.vy;
+      ball.vy+=.25;
+      if(ball.x>hoop.x-25&&ball.x<hoop.x+15&&ball.y>hoop.y+15&&ball.y<hoop.y+40){
+        made++;
+        add(25);
+        ball.active=false;
+        ball={x:80,y:480,vx:0,vy:0,active:false};
+        if(made>=5)return win('Five baskets!');
+      }
+      if(ball.y>600||ball.x>400)
+        ball={x:80,y:480,vx:0,vy:0,active:false};
+    }
+    circle(ball.x,ball.y,12,'#fb923c');
+    drawText('BASKETS '+made+'/5',200,50,18,'#fff');
+    if(f>1800)return lose('Time is up!');
+  },16);
+}
+
+function gameTower(){
+  let towers=[],enemies=[],f=0,kills=0;
+  canvas.onclick=e=>{
+    let r=canvas.getBoundingClientRect(),
+        x=(e.clientX-r.left)*400/r.width,
+        y=(e.clientY-r.top)*600/r.height;
+    if(y>60&&y<540&&score>=20){
+      towers.push({x,y,cool:0});
+      score-=20;
+      updateScore();
+    }
+  };
+  tick(()=>{
+    f++;
+    base('#101827');
+    ctx.strokeStyle='#64748b';
+    ctx.lineWidth=35;
+    ctx.beginPath();
+    ctx.moveTo(0,300);
+    ctx.lineTo(120,300);
+    ctx.lineTo(120,420);
+    ctx.lineTo(280,420);
+    ctx.lineTo(280,180);
+    ctx.lineTo(400,180);
+    ctx.stroke();
+    if(f%40===0)enemies.push({x:0,y:300,hp:3,step:0});
+    enemies.forEach(e=>{
+      e.step++;
+      if(e.step<120)e.x+=1.1;
+      else if(e.step<240)e.y+=1;
+      else if(e.step<400)e.x+=1;
+      else e.y-=1;
+    });
+    if(enemies.some(e=>e.x>395))return lose('An enemy reached the exit!');
+    towers.forEach(t=>{
+      circle(t.x,t.y,13,'#60a5fa');
+      if(++t.cool%30===0&&enemies.length){
+        let i=enemies.findIndex(e=>Math.hypot(e.x-t.x,e.y-t.y)<130);
+        if(i>=0){
+          enemies.splice(i,1);
+          kills++;
+          add(10);
+        }
+      }
+    });
+    enemies.forEach(e=>circle(e.x,e.y,10,'#fb7185'));
+    drawText('TAP FIELD TO PLACE TOWER · COST 20',200,30,11,'#fff');
+    if(kills>=8+level)return win('Wave defended!');
+    if(f>1600)return lose('Too many enemies!');
+  },16);
+}
+
+function gamePong(){
+  let p=250,ai=250,b={x:200,y:300,dx:4,dy:3},you=0,them=0;
+  tick(()=>{
+    base();
+    if(keys.ArrowUp||keys.KeyW||touch.left)p-=6;
+    if(keys.ArrowDown||keys.KeyS||touch.right)p+=6;
+    p=Math.max(0,Math.min(510,p));
+    ai+=(b.y-(ai+45))*.04;
+    rect({x:15,y:p,w:12,h:90},'#2dd4bf');
+    rect({x:373,y:ai,w:12,h:90},'#818cf8');
+    b.x+=b.dx;
+    b.y+=b.dy;
+    if(b.y<8||b.y>592)b.dy*=-1;
+    if(b.x<30&&b.y>p&&b.y<p+90)b.dx=Math.abs(b.dx);
+    if(b.x>370&&b.y>ai&&b.y<ai+90)b.dx=-Math.abs(b.dx);
+    if(b.x<0||b.x>400){
+      if(b.x<0)them++;else you++;
+      b={x:200,y:300,dx:(you>them?-1:1)*4,dy:3};
+      if(you>=7)return win('You won '+you+'–'+them+'!');
+      if(them>=7)return lose('Computer won '+them+'–'+you+'.');
+    }
+    drawText(you+'     '+them,200,50,28,'#fff');
+    circle(b.x,b.y,8,'white');
+  },16);
+}
+
+function gameDrift(){
+  let car=180,f=0,cones=[];
+  tick(()=>{
+    f++;
+    base('#17251c');
+    ctx.fillStyle='#4b5563';
+    ctx.fillRect(55,0,290,600);
+    ctx.strokeStyle='#fef3c7';
+    ctx.setLineDash([22,20]);
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.moveTo(200,0);
+    ctx.lineTo(200,600);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if(f%35===0)cones.push({x:90+Math.random()*220,y:-20});
+    cones.forEach(c=>c.y+=5);
+    cones=cones.filter(c=>c.y<620);
+    if(keys.ArrowLeft||keys.KeyA||touch.left)car-=5;
+    if(keys.ArrowRight||keys.KeyD||touch.right)car+=5;
+    car=Math.max(65,Math.min(300,car));
+    rect({x:car,y:500,w:36,h:60},'#e879f9');
+    cones.forEach(c=>{
+      circle(c.x,c.y,12,'#fb923c');
+      if(Math.abs(car+18-c.x)<27&&Math.abs(530-c.y)<35)lose('Hit a cone!');
+    });
+    if(f%10===0)add();
+    if(f>800)return win('Lap completed!');
+  },16);
+}
+
+function gameBlocks(){
+  let grid=Array.from({length:25},()=>Array(10).fill(0)),
+      piece=null,f=0;
+  function spawn(){
+    piece={x:4,y:0,shape:[[1,1,1],[0,1,0]]};
+    if(piece.shape.some((row,dy)=>row.some((v,dx)=>v&&(grid[piece.y+dy]?.[piece.x+dx]??1)))){
+      lose('Stack reached the top!');
+    }
+  }
+  function valid(x,y,shape){
+    return shape.every((row,dy)=>row.every((v,dx)=>!v||(x+dx>=0&&x+dx<10&&y+dy<25&&y+dy>=0&&!grid[y+dy][x+dx])));
+  }
+  function lock(){
+    piece.shape.forEach((row,dy)=>row.forEach((v,dx)=>{
+      if(v&&grid[piece.y+dy])grid[piece.y+dy][piece.x+dx]=1;
+    }));
+    let n=grid.filter(row=>row.every(Boolean)).length;
+    grid=grid.filter(row=>!row.every(Boolean));
+    while(grid.length<25)grid.unshift(Array(10).fill(0));
+    add(n*100);
+    spawn();
+  }
+  spawn();
+  tick(()=>{
+    f++;
+    if(keys.ArrowLeft||keys.KeyA){
+      if(valid(piece.x-1,piece.y,piece.shape))piece.x--;
+      keys.ArrowLeft=keys.KeyA=false;
+    }
+    if(keys.ArrowRight||keys.KeyD){
+      if(valid(piece.x+1,piece.y,piece.shape))piece.x++;
+      keys.ArrowRight=keys.KeyD=false;
+    }
+    if(keys.ArrowUp){
+      piece.shape=piece.shape[0].map((_,i)=>piece.shape.map(row=>row[i]).reverse());
+      keys.ArrowUp=false;
+    }
+    if(f%25===0){
+      if(valid(piece.x,piece.y+1,piece.shape))piece.y++;
+      else lock();
+    }
+    base();
+    grid.forEach((row,y)=>row.forEach((v,x)=>{
+      if(v)rect({x:x*20,y:100+y*20,w:18,h:18},'#facc15');
+    }));
+    piece?.shape.forEach((row,dy)=>row.forEach((v,dx)=>{
+      if(v)rect({x:(piece.x+dx)*20,y:100+(piece.y+dy)*20,w:18,h:18},'#a78bfa');
+    }));
+    drawText('CLEAR ROWS TO SCORE',200,45,16,'#fff');
+    if(score>=500)return win('Puzzle mastered!');
+  },16);
+}
+
+function gameFlight(){
+  let y=300,vy=0,obs=[],f=0;
+  run.flap=()=>{vy=-5.5};
+  tick(()=>{
+    f++;
+    base('#08152a');
+    vy+=.25;
+    y+=vy;
+    if(f%85===0)obs.push({x:410,gap:160+Math.random()*240});
+    obs.forEach(o=>o.x-=3.2);
+    obs=obs.filter(o=>o.x>-60);
+    if(y<0||y>600)return lose('You flew out of bounds!');
+    for(const o of obs){
+      if(o.x<55&&o.x+45>25&&(y<o.gap-75||y>o.gap+75))
+        return lose('You hit a barrier!');
+    }
+    obs.forEach(o=>{
+      rect({x:o.x,y:0,w:45,h:o.gap-75},'#38bdf8');
+      rect({x:o.x,y:o.gap+75,w:45,h:600-o.gap-75},'#38bdf8');
+    });
+    circle(40,y,13,'#facc15');
+    if(f%10===0)add();
+    if(f>1200)return win('Flight complete!');
+  },16);
+}
+</script>
+</body>
+</html>
